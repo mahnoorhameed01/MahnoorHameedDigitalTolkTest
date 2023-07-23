@@ -2,11 +2,14 @@
 
 namespace DTApi\Http\Controllers;
 
+use App\Helper\Helper;
+use app\Requests\BookingRequest;
 use DTApi\Models\Job;
 use DTApi\Http\Requests;
 use DTApi\Models\Distance;
 use Illuminate\Http\Request;
 use DTApi\Repository\BookingRepository;
+use Exception;
 
 /**
  * Class BookingController
@@ -33,19 +36,20 @@ class BookingController extends Controller
      * @param Request $request
      * @return mixed
      */
-    public function index(Request $request)
+    public function index(BookingRequest $request) // added own request class
     {
-        if($user_id = $request->get('user_id')) {
-
-            $response = $this->repository->getUsersJobs($user_id);
-
+        try {
+            if($user_id = $request->get('user_id')) {
+                $response = $this->repository->getUsersJobs($user_id);
+            }
+            elseif($request->__authenticatedUser->user_type == env('ADMIN_ROLE_ID') || $request->__authenticatedUser->user_type == env('SUPERADMIN_ROLE_ID'))
+            {
+                $response = $this->repository->getAll($request);
+            }
+            return response($response);
+        } catch (Exception $exception) {
+           return Helper::exceptionLogs('Booking Controller: index', $exception);
         }
-        elseif($request->__authenticatedUser->user_type == env('ADMIN_ROLE_ID') || $request->__authenticatedUser->user_type == env('SUPERADMIN_ROLE_ID'))
-        {
-            $response = $this->repository->getAll($request);
-        }
-
-        return response($response);
     }
 
     /**
@@ -65,9 +69,7 @@ class BookingController extends Controller
      */
     public function store(Request $request)
     {
-        $data = $request->all();
-
-        $response = $this->repository->store($request->__authenticatedUser, $data);
+        $response = $this->repository->store($request->all());
 
         return response($response);
 
@@ -80,6 +82,7 @@ class BookingController extends Controller
      */
     public function update($id, Request $request)
     {
+        // Here we can create our own request class so that we can prepare data and remove _token and submit keys from request.
         $data = $request->all();
         $cuser = $request->__authenticatedUser;
         $response = $this->repository->updateJob($id, array_except($data, ['_token', 'submit']), $cuser);
@@ -93,10 +96,7 @@ class BookingController extends Controller
      */
     public function immediateJobEmail(Request $request)
     {
-        $adminSenderEmail = config('app.adminemail');
-        $data = $request->all();
-
-        $response = $this->repository->storeJobEmail($data);
+        $response = $this->repository->storeJobEmail($request->all());
 
         return response($response);
     }
@@ -122,11 +122,9 @@ class BookingController extends Controller
      */
     public function acceptJob(Request $request)
     {
-        $data = $request->all();
-        $user = $request->__authenticatedUser;
-
-        $response = $this->repository->acceptJob($data, $user);
-
+        // all parameters can be fetched from $data. No need to pass 2 parameters to function
+        $response = $this->repository->acceptJob($request->all());
+        
         return response($response);
     }
 
@@ -184,10 +182,7 @@ class BookingController extends Controller
      */
     public function getPotentialJobs(Request $request)
     {
-        $data = $request->all();
-        $user = $request->__authenticatedUser;
-
-        $response = $this->repository->getPotentialJobs($user);
+        $response = $this->repository->getPotentialJobs($request->__authenticatedUser);
 
         return response($response);
     }
